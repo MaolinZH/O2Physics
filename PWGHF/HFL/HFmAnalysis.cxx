@@ -96,7 +96,7 @@ struct HFEventSelection {
   //select events
   template <uint32_t TEventFillMap, typename TEvent>
   void runEventSel(TEvent const& event, aod::BCs const& bcs)
-  { 
+  {
     VarManager::ResetValues(0, VarManager::kNEventWiseVariables);
     VarManager::FillEvent<TEventFillMap>(event, fValues);
     fHistMan->FillHistClass("EventBeforeCuts", fValues);
