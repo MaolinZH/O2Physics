@@ -93,10 +93,10 @@ struct HFEventSelection {
 
   Produces<aod::EventCuts> eventSel;
   
-  //select events
   template <uint32_t TEventFillMap, typename TEvent>
   void runEventSel(TEvent const& event, aod::BCs const& bcs)
   {
+    //select events
     VarManager::ResetValues(0, VarManager::kNEventWiseVariables);
     VarManager::FillEvent<TEventFillMap>(event, fValues);
     fHistMan->FillHistClass("EventBeforeCuts", fValues);
@@ -178,10 +178,10 @@ struct MuonSelection {
     VarManager::SetUseVars(AnalysisCut::fgUsedVars);
   }
 
-  //select muons in data
   template <uint32_t TEventFillMap, uint32_t TMuonFillMap, typename TEvent, typename TMuons>
   void runDataMuonSel(TEvent const& event, aod::BCs const& bcs, TMuons const& tracks)
   {
+    //select muons in data
     if (event.isEventSelected() == 0)
       return;
 
@@ -226,10 +226,10 @@ struct MuonSelection {
     }//end loop over muon tracks
   }
 
-  //select muon in MC
   template <uint32_t TEventFillMap, uint32_t TMuonFillMap, uint32_t TTrackMCFillMap, typename TEvent, typename TMuons, typename TMC>
   void runMCMuonSel(TEvent const& event, aod::BCs const& bcs, TMuons const& tracks, TMC const& mc)
   {
+    //select muon in MC
     if (event.isEventSelected() == 0)
       return;
 
