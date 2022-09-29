@@ -228,8 +228,8 @@ struct MuonSelection {
 
   template <uint32_t TEventFillMap, uint32_t TMuonFillMap, uint32_t TTrackMCFillMap, typename TEvent, typename TMuons, typename TMC>
   void runMCMuonSel(TEvent const& event, aod::BCs const& bcs, TMuons const& tracks, TMC const& mc)
-  //select muons in MC
   {
+    //select muons in MC
     if (event.isEventSelected() == 0)
       return;
 
