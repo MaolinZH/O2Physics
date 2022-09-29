@@ -10,8 +10,7 @@
 // or submit itself to any jurisdiction.
 
 /// \file HFmAnalysis.cxx
-/// \brief HF single muon analysis task
-/// \This task is derived from the DQ framework and it is used to extract the observables on single muons needed for the HF-muon analysis.
+/// \brief Task derived from the DQ framework and used to extract the observables on single muons needed for the HF-muon analysis.
 /// \author Maolin Zhang <maolin.zhang@cern.ch>, CCNU
 
 #include "Framework/runDataProcessing.h"
@@ -53,13 +52,12 @@ constexpr static uint32_t gMuonFillMap(VarManager::ObjTypes::Muon | VarManager::
 constexpr static uint32_t gEventFillMap(VarManager::ObjTypes::BC | VarManager::ObjTypes::Collision);
 constexpr static uint32_t gTrackMCFillMap(VarManager::ObjTypes::ParticleMC);
 
-void DefineHistograms(HistogramManager*, TString);
+void defineHistograms(HistogramManager*, TString);
 
-struct HFEventSelection {
-  Configurable<bool> softwareTriggerSwitch{"softwareTriggerSwitch", false, "whether apply the software trigger"};
-  Configurable<bool> zVtxSwitch{"zVtxSwitch", false, "whether apply the VtxZ cuts"};
+struct HfmEventSelection {
+  Configurable<bool> applySoftwareTrigger{"appllySoftwareTrigger", false, "whether to apply the software trigger"};
   Configurable<float> softwareTrigger{"softwareTrigger", VarManager::kIsMuonSingleLowPt7, "software tigger flag"};
-
+  Configurable<bool> applyCutZVtx{"applyzVtx", false, "whether to apply the VtxZ cut"};
   Configurable<float> zVtxMin{"zVtxMin", -10., "min. z of primary vertex [cm]"};
   Configurable<float> zVtxMax{"zVtxMax", 10., "max. z of primary vertex [cm]"};
 
@@ -76,9 +74,9 @@ struct HFEventSelection {
     fEventCut = new AnalysisCompositeCut("event selection", "Event Selection", true);
 
     AnalysisCut fCut;
-    if (zVtxSwitch)
+    if (applyZVtx)
       fCut.AddCut(VarManager::kVtxZ, zVtxMin, zVtxMax, false);
-    if (softwareTriggerSwitch)
+    if (applySoftwareTrigger)
       fCut.AddCut(softwareTrigger, 0.5, 1.5, false);
     fEventCut->AddCut(&fCut);
 
@@ -119,8 +117,8 @@ struct HFEventSelection {
     runEventSel<gEventFillMap>(event, bcs);
   }
 
-  PROCESS_SWITCH(HFEventSelection, processEventDataAO2D, "run event selection with Data AO2D file", true);
-  PROCESS_SWITCH(HFEventSelection, processEventMCAO2D, "run event selection with MC AO2D file", false);
+  PROCESS_SWITCH(HfmEventSelection, processEventDataAO2D, "run event selection with Data AO2D file", true);
+  PROCESS_SWITCH(HfmEventSelection, processEventMCAO2D, "run event selection with MC AO2D file", false);
 };
 
 struct MuonSelection {
@@ -317,12 +315,12 @@ struct MuonSelection {
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
 {
   return WorkflowSpec{
-    adaptAnalysisTask<HFEventSelection>(cfgc),
+    adaptAnalysisTask<HfmEventSelection>(cfgc),
     adaptAnalysisTask<MuonSelection>(cfgc),
   };
 }
 
-void DefineHistograms(HistogramManager* histMan, TString histClasses)
+void defineHistograms(HistogramManager* histMan, TString histClasses)
 {
   //
   // Define here the histograms for all the classes required in analysis.
