@@ -10,10 +10,10 @@
 // or submit itself to any jurisdiction.
 
 /// \file HFmAnalysis.cxx
+/// \brief HF single muon analysis task
 /// \This task is derived from the DQ framework and it is used to extract the observables on single muons needed for the HF-muon analysis.
 /// \author Maolin Zhang <maolin.zhang@cern.ch>, CCNU
 
-#include "CCDB/BasicCCDBManager.h"
 #include "Framework/runDataProcessing.h"
 #include "Framework/AnalysisTask.h"
 #include "Framework/ASoAHelpers.h"
@@ -28,11 +28,6 @@
 #include "PWGDQ/DataModel/ReducedInfoTables.h"
 #include "ReconstructionDataFormats/TrackFwd.h"
 #include "Common/DataModel/EventSelection.h"
-#include <THashList.h>
-#include <vector>
-#include <memory>
-#include <THnSparse.h>
-#include "TDatabasePDG.h"
 
 using namespace o2;
 using namespace o2::aod;
@@ -40,12 +35,12 @@ using namespace o2::framework;
 
 namespace o2::aod
 {
-namespace dqanalysisflags
+namespace dq_analysis_flags
 {
 DECLARE_SOA_COLUMN(IsEventSelected, isEventSelected, int);
 }
 
-DECLARE_SOA_TABLE(EventCuts, "AOD", "EVENTCUTS", dqanalysisflags::IsEventSelected);
+DECLARE_SOA_TABLE(EventCuts, "AOD", "EVENTCUTS", dq_analysis_flags::IsEventSelected);
 } // namespace o2::aod
 
 using MyCollisions = o2::soa::Join<aod::Collisions, aod::EvSels>;
@@ -54,19 +49,19 @@ using MyEventsSelected = o2::soa::Join<aod::Collisions, aod::EvSels, o2::aod::Ev
 using MyMcEventsSelected = o2::soa::Join<aod::Collisions, aod::McCollisionLabels, aod::EvSels, o2::aod::EventCuts>;
 using MyMuons = o2::soa::Join<aod::FullFwdTracks, aod::McFwdTrackLabels>;
 
-constexpr static uint32_t gkMuonFillMap(VarManager::ObjTypes::Muon | VarManager::ObjTypes::MuonCov);
-constexpr static uint32_t gkEventFillMap(VarManager::ObjTypes::BC | VarManager::ObjTypes::Collision);
-constexpr static uint32_t gkTrackMCFillMap(VarManager::ObjTypes::ParticleMC);
+constexpr static uint32_t gMuonFillMap(VarManager::ObjTypes::Muon | VarManager::ObjTypes::MuonCov);
+constexpr static uint32_t gEventFillMap(VarManager::ObjTypes::BC | VarManager::ObjTypes::Collision);
+constexpr static uint32_t gTrackMCFillMap(VarManager::ObjTypes::ParticleMC);
 
 void DefineHistograms(HistogramManager*, TString);
 
-struct EventSelection {
-  Configurable<bool> fConfigTriggerUsed{"cfgtriggerUsed", false, "whether apply the software trigger"};
-  Configurable<bool> fConfigVtxZUsed{"cfgVtxZUsed", false, "whether apply the VtxZ trigger"};
-  Configurable<float> fConfigSoftwareTrigger{"cfgsoftwaretrigger", VarManager::kIsMuonSingleLowPt7, "softerware tigger flag"};
+struct HFEventSelection {
+  Configurable<bool> softwareTriggerSwitch{"softwareTriggerSwitch", false, "whether apply the software trigger"};
+  Configurable<bool> zVtxSwitch{"zVtxSwitch", false, "whether apply the VtxZ cuts"};
+  Configurable<float> softwareTrigger{"softwareTrigger", VarManager::kIsMuonSingleLowPt7, "software tigger flag"};
 
-  Configurable<float> fConfigVtxZMIN{"cfgVtxZMIN", -10., "min. z of primary vertex [cm]"};
-  Configurable<float> fConfigVtxZMAX{"cfgVtxZMAX", 10., "max. z of primary vertex [cm]"};
+  Configurable<float> zVtxMin{"zVtxMin", -10., "min. z of primary vertex [cm]"};
+  Configurable<float> zVtxMax{"zVtxMax", 10., "max. z of primary vertex [cm]"};
 
   HistogramManager* fHistMan;
   OutputObj<THashList> fOutputList{"output"};
@@ -81,10 +76,10 @@ struct EventSelection {
     fEventCut = new AnalysisCompositeCut("event selection", "Event Selection", true);
 
     AnalysisCut fCut;
-    if (fConfigVtxZUsed)
-      fCut.AddCut(VarManager::kVtxZ, fConfigVtxZMIN, fConfigVtxZMAX, false);
-    if (fConfigTriggerUsed)
-      fCut.AddCut(fConfigSoftwareTrigger, 0.5, 1.5, false);
+    if (zVtxSwitch)
+      fCut.AddCut(VarManager::kVtxZ, zVtxMin, zVtxMax, false);
+    if (softwareTriggerSwitch)
+      fCut.AddCut(softwareTrigger, 0.5, 1.5, false);
     fEventCut->AddCut(&fCut);
 
     fHistMan = new HistogramManager("analysisHistos", "aa", VarManager::kNVars);
@@ -97,9 +92,11 @@ struct EventSelection {
   }
 
   Produces<aod::EventCuts> eventSel;
+  
+  //select events
   template <uint32_t TEventFillMap, typename TEvent>
   void runEventSel(TEvent const& event, aod::BCs const& bcs)
-  {
+  { 
     VarManager::ResetValues(0, VarManager::kNEventWiseVariables);
     VarManager::FillEvent<TEventFillMap>(event, fValues);
     fHistMan->FillHistClass("EventBeforeCuts", fValues);
@@ -114,16 +111,16 @@ struct EventSelection {
 
   void processEventDataAO2D(MyCollisions::iterator const& event, aod::BCs const& bcs)
   {
-    runEventSel<gkEventFillMap>(event, bcs);
+    runEventSel<gEventFillMap>(event, bcs);
   }
 
   void processEventMCAO2D(MyMcCollisions::iterator const& event, aod::BCs const& bcs)
   {
-    runEventSel<gkEventFillMap>(event, bcs);
+    runEventSel<gEventFillMap>(event, bcs);
   }
 
-  PROCESS_SWITCH(EventSelection, processEventDataAO2D, "run event selection with Data AO2D file", true);
-  PROCESS_SWITCH(EventSelection, processEventMCAO2D, "run event selection with MC AO2D file", false);
+  PROCESS_SWITCH(HFEventSelection, processEventDataAO2D, "run event selection with Data AO2D file", true);
+  PROCESS_SWITCH(HFEventSelection, processEventMCAO2D, "run event selection with MC AO2D file", false);
 };
 
 struct MuonSelection {
@@ -141,27 +138,27 @@ struct MuonSelection {
 
   void init(o2::framework::InitContext&)
   {
-    AxisSpec apT{200, 0., 200., "#it{p}_{T} (GeV/#it{c})"};
-    AxisSpec aEta{500, -5., 5., "#eta"};
-    AxisSpec aDCA{500, 0., 5., "DCA (cm)"};
-    AxisSpec aSign{5, -2.5, 2.5, "Charge"};
-    AxisSpec aP{500, 0., 500., "p (GeV/#it{c})"};
-    AxisSpec aVtxZ{400, -20., 20., "Vertex Z (cm)"};
+    AxisSpec axispT{200, 0., 200., "#it{p}_{T} (GeV/#it{c})"};
+    AxisSpec axisEta{500, -5., 5., "#eta"};
+    AxisSpec axisDCA{500, 0., 5., "DCA (cm)"};
+    AxisSpec axisSign{5, -2.5, 2.5, "Charge"};
+    AxisSpec axisP{500, 0., 500., "p (GeV/#it{c})"};
+    AxisSpec axisVtxZ{400, -20., 20., "Vertex Z (cm)"};
 
-    AxisSpec aTrkType{5, -0.5, 4.5, "TrackType"};
-    AxisSpec aMCmask{200, -0.5, 199.5, "mcMask"};
+    AxisSpec axisTrkType{5, -0.5, 4.5, "TrackType"};
+    AxisSpec axisMCmask{200, -0.5, 199.5, "mcMask"};
     //kinematics for MC
-    AxisSpec apTGen{200, 0., 200., "#it{p}_{T} Truth (GeV/#it{c})"};
-    AxisSpec aEtaGen{500, -5., 5., "#eta_{Truth}"};
-    AxisSpec aPGen{500, 0., 500., "p_{Truth} (GeV/#it{c})"};
-    AxisSpec apTDif{200, -2., 2., "#it{p}_{T} diff (GeV/#it{c})"};
-    AxisSpec aEtaDif{200, -2., 2., "#eta diff"};
-    AxisSpec aPDif{200, -2., 2., "p diff (GeV/#it{c})"};
+    AxisSpec axispTGen{200, 0., 200., "#it{p}_{T} Truth (GeV/#it{c})"};
+    AxisSpec axisEtaGen{500, -5., 5., "#eta_{Truth}"};
+    AxisSpec axisPGen{500, 0., 500., "p_{Truth} (GeV/#it{c})"};
+    AxisSpec axispTDif{200, -2., 2., "#it{p}_{T} diff (GeV/#it{c})"};
+    AxisSpec axisEtaDif{200, -2., 2., "#eta diff"};
+    AxisSpec axisPDif{200, -2., 2., "p diff (GeV/#it{c})"};
 
-    HistogramConfigSpec cfgTHnMu{HistType::kTHnSparseD, {apT, aEta, aDCA, aSign, aP, aVtxZ, aTrkType, aMCmask}, 8};
-    HistogramConfigSpec cfgTHnPt{HistType::kTHnSparseD, {apT, apTGen, apTDif, aTrkType}, 4};
-    HistogramConfigSpec cfgTHnEta{HistType::kTHnSparseD, {aEta, aEtaGen, aEtaDif, aTrkType}, 4};
-    HistogramConfigSpec cfgTHnP{HistType::kTHnSparseD, {aP, aPGen, aPDif, aTrkType}, 4};
+    HistogramConfigSpec cfgTHnMu{HistType::kTHnSparseD, {axispT, axisEta, axisDCA, axisSign, axisP, axisVtxZ, axisTrkType, axisMCmask}, 8};
+    HistogramConfigSpec cfgTHnPt{HistType::kTHnSparseD, {axispT, axispTGen, axispTDif, axisTrkType}, 4};
+    HistogramConfigSpec cfgTHnEta{HistType::kTHnSparseD, {axisEta, axisEtaGen, axisEtaDif, axisTrkType}, 4};
+    HistogramConfigSpec cfgTHnP{HistType::kTHnSparseD, {axisP, axisPGen, axisPDif, axisTrkType}, 4};
 
     registry.add("hMuBcuts", "", cfgTHnMu);
     registry.add("hMuAcuts", "", cfgTHnMu);
@@ -181,6 +178,7 @@ struct MuonSelection {
     VarManager::SetUseVars(AnalysisCut::fgUsedVars);
   }
 
+  //select muons in data
   template <uint32_t TEventFillMap, uint32_t TMuonFillMap, typename TEvent, typename TMuons>
   void runDataMuonSel(TEvent const& event, aod::BCs const& bcs, TMuons const& tracks)
   {
@@ -188,26 +186,27 @@ struct MuonSelection {
       return;
 
     VarManager::ResetValues(0, VarManager::kNMuonTrackVariables, fValues);
-    VarManager::FillEvent<gkEventFillMap>(event, fValues);
+    VarManager::FillEvent<gEventFillMap>(event, fValues);
 
+    //loop over muon tracks
     for (auto const& track : tracks) {
       VarManager::FillTrack<TMuonFillMap>(track, fValues);
 
       // compute DCAXY
-      std::vector<double> vcovs{
+      std::vector<double> vecCovs{
         track.cXX(), track.cXY(), track.cYY(),
         track.cPhiX(), track.cPhiY(), track.cPhiPhi(),
         track.cTglX(), track.cTglY(), track.cTglPhi(), track.cTglTgl(),
         track.c1PtX(), track.c1PtY(), track.c1PtPhi(), track.c1PtTgl(), track.c1Pt21Pt2()};
 
-      SMatrix55 tcovs(vcovs.begin(), vcovs.end());
-      SMatrix5 tpars(track.x(), track.y(), track.phi(), track.tgl(), track.signed1Pt());
+      SMatrix55 trackCovs(vecCovs.begin(), vecCovs.end());
+      SMatrix5 trackPars(track.x(), track.y(), track.phi(), track.tgl(), track.signed1Pt());
 
-      o2::track::TrackParCovFwd tparcov{track.z(), tpars, tcovs, track.chi2()};
-      tparcov.propagateToZlinear(event.posZ());
+      o2::track::TrackParCovFwd trackParcov{track.z(), trackPars, trackCovs, track.chi2()};
+      trackParcov.propagateToZlinear(event.posZ());
 
-      const auto dcaX(tparcov.getX() - event.posX());
-      const auto dcaY(tparcov.getY() - event.posY());
+      const auto dcaX(trackParcov.getX() - event.posX());
+      const auto dcaY(trackParcov.getY() - event.posY());
       const auto dcaXY(std::sqrt(dcaX * dcaX + dcaY * dcaY));
       //Before Muon Cuts
       registry.fill(HIST("hMuBcuts"),
@@ -224,9 +223,10 @@ struct MuonSelection {
                       fValues[VarManager::kCharge], track.p(),
                       fValues[VarManager::kVtxZ],
                       fValues[VarManager::kMuonTrackType], 0);
-    }
+    }//end loop over muon tracks
   }
 
+  //select muon in MC
   template <uint32_t TEventFillMap, uint32_t TMuonFillMap, uint32_t TTrackMCFillMap, typename TEvent, typename TMuons, typename TMC>
   void runMCMuonSel(TEvent const& event, aod::BCs const& bcs, TMuons const& tracks, TMC const& mc)
   {
@@ -234,33 +234,34 @@ struct MuonSelection {
       return;
 
     VarManager::ResetValues(0, VarManager::kNMuonTrackVariables, fValues);
-    VarManager::FillEvent<gkEventFillMap>(event, fValues);
+    VarManager::FillEvent<gEventFillMap>(event, fValues);
 
+    //loop over muon tracks
     for (auto const& track : tracks) {
       VarManager::FillTrack<TMuonFillMap>(track, fValues);
 
       if (!track.has_mcParticle()) {
         continue;
       }
-      auto mctrack = track.mcParticle();
+      auto mcParticle = track.mcParticle();
 
-      VarManager::FillTrack<TTrackMCFillMap>(mctrack, fValues);
+      VarManager::FillTrack<TTrackMCFillMap>(mcParticle, fValues);
 
       // compute DCAXY
-      std::vector<double> vcovs{
+      std::vector<double> vecCovs{
         track.cXX(), track.cXY(), track.cYY(),
         track.cPhiX(), track.cPhiY(), track.cPhiPhi(),
         track.cTglX(), track.cTglY(), track.cTglPhi(), track.cTglTgl(),
         track.c1PtX(), track.c1PtY(), track.c1PtPhi(), track.c1PtTgl(), track.c1Pt21Pt2()};
 
-      SMatrix55 tcovs(vcovs.begin(), vcovs.end());
-      SMatrix5 tpars(track.x(), track.y(), track.phi(), track.tgl(), track.signed1Pt());
+      SMatrix55 trackCovs(vecCovs.begin(), vecCovs.end());
+      SMatrix5 trackPars(track.x(), track.y(), track.phi(), track.tgl(), track.signed1Pt());
 
-      o2::track::TrackParCovFwd tparcov{track.z(), tpars, tcovs, track.chi2()};
-      tparcov.propagateToZlinear(event.posZ());
+      o2::track::TrackParCovFwd trackParcov{track.z(), trackPars, trackCovs, track.chi2()};
+      trackParcov.propagateToZlinear(event.posZ());
 
-      const auto dcaX(tparcov.getX() - event.posX());
-      const auto dcaY(tparcov.getY() - event.posY());
+      const auto dcaX(trackParcov.getX() - event.posX());
+      const auto dcaY(trackParcov.getY() - event.posY());
       const auto dcaXY(std::sqrt(dcaX * dcaX + dcaY * dcaY));
       //Before Muon Cuts
       registry.fill(HIST("hMuBcuts"),
@@ -294,19 +295,19 @@ struct MuonSelection {
         registry.fill(HIST("hPAcuts"),
                       fValues[VarManager::kP], fValues[VarManager::kMCPt] * std::cosh(fValues[VarManager::kMCEta]), fValues[VarManager::kMCPt] * std::cosh(fValues[VarManager::kMCEta]) - fValues[VarManager::kP], fValues[VarManager::kMuonTrackType]);
       }
-    }
+    }//end loop over muon tracks
   }
 
   void processMuonDataAO2D(MyEventsSelected::iterator const& event, aod::BCs const& bcs,
                            aod::FullFwdTracks const& tracks)
   {
-    runDataMuonSel<gkEventFillMap, gkMuonFillMap>(event, bcs, tracks);
+    runDataMuonSel<gEventFillMap, gMuonFillMap>(event, bcs, tracks);
   }
 
   void processMuonMCAO2D(MyMcEventsSelected::iterator const& event, aod::BCs const& bcs,
                          MyMuons const& tracks, aod::McParticles const& mc)
   {
-    runMCMuonSel<gkEventFillMap, gkMuonFillMap, gkTrackMCFillMap>(event, bcs, tracks, mc);
+    runMCMuonSel<gEventFillMap, gMuonFillMap, gTrackMCFillMap>(event, bcs, tracks, mc);
   }
 
   PROCESS_SWITCH(MuonSelection, processMuonDataAO2D, "run muonselection with Data AO2D file", true);
@@ -316,13 +317,18 @@ struct MuonSelection {
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
 {
   return WorkflowSpec{
-    adaptAnalysisTask<EventSelection>(cfgc),
+    adaptAnalysisTask<HFEventSelection>(cfgc),
     adaptAnalysisTask<MuonSelection>(cfgc),
   };
 }
 
 void DefineHistograms(HistogramManager* histMan, TString histClasses)
 {
+  //
+  // Define here the histograms for all the classes required in analysis.
+  //  The histogram classes are provided in the histClasses string, separated by semicolon ";"
+  //  The histogram classes and their components histograms are defined below depending on the name of the histogram class
+  //
   std::unique_ptr<TObjArray> objArray(histClasses.Tokenize(";"));
 
   for (Int_t iclass = 0; iclass < objArray->GetEntries(); ++iclass) {
