@@ -223,7 +223,7 @@ struct MuonSelection {
                       fValues[VarManager::kCharge], track.p(),
                       fValues[VarManager::kVtxZ],
                       fValues[VarManager::kMuonTrackType], 0);
-    }//end loop over muon tracks
+    } //end loop over muon tracks
   }
 
   template <uint32_t TEventFillMap, uint32_t TMuonFillMap, uint32_t TTrackMCFillMap, typename TEvent, typename TMuons, typename TMC>
@@ -295,7 +295,7 @@ struct MuonSelection {
         registry.fill(HIST("hPAcuts"),
                       fValues[VarManager::kP], fValues[VarManager::kMCPt] * std::cosh(fValues[VarManager::kMCEta]), fValues[VarManager::kMCPt] * std::cosh(fValues[VarManager::kMCEta]) - fValues[VarManager::kP], fValues[VarManager::kMuonTrackType]);
       }
-    }//end loop over muon tracks
+    } //end loop over muon tracks
   }
 
   void processMuonDataAO2D(MyEventsSelected::iterator const& event, aod::BCs const& bcs,
