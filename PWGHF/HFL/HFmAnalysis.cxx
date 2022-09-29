@@ -92,7 +92,7 @@ struct HFEventSelection {
   }
 
   Produces<aod::EventCuts> eventSel;
-  
+
   template <uint32_t TEventFillMap, typename TEvent>
   void runEventSel(TEvent const& event, aod::BCs const& bcs)
   {
