@@ -56,37 +56,37 @@ void defineHistograms(HistogramManager*, TString);
 
 struct HfmEventSelection {
   Configurable<bool> applySoftwareTrigger{"appllySoftwareTrigger", false, "whether to apply the software trigger"};
-  Configurable<int> softwareTrigger{"softwareTrigger", VarManager::kIsMuonSingleLowPt7, "software tigger flag"};
+  Configurable<int> softwareTrigger{"softwareTrigger", VarManager::kIsMuonSingleLowPt7, "software trigger flag"};
   Configurable<bool> applyCutZVtx{"applyzVtx", false, "whether to apply the VtxZ cut"};
   Configurable<float> zVtxMin{"zVtxMin", -10., "min. z of primary vertex [cm]"};
   Configurable<float> zVtxMax{"zVtxMax", 10., "max. z of primary vertex [cm]"};
 
-  HistogramManager* fHistMan;
-  OutputObj<THashList> fOutputList{"output"};
+  HistogramManager* histMan;
+  OutputObj<THashList> outputList{"output"};
 
-  float* fValues;
-  AnalysisCompositeCut* fEventCut;
+  float* values;
+  AnalysisCompositeCut* eventCut;
 
   void init(o2::framework::InitContext&)
   {
     VarManager::SetDefaultVarNames();
-    fValues = new float[VarManager::kNVars];
-    fEventCut = new AnalysisCompositeCut("event selection", "Event Selection", true);
+    values = new float[VarManager::kNVars];
+    eventCut = new AnalysisCompositeCut("event selection", "Event Selection", true);
 
-    AnalysisCut fCut;
-    if (applyZVtx)
-      fCut.AddCut(VarManager::kVtxZ, zVtxMin, zVtxMax, false);
+    AnalysisCut cut;
+    if (applyCutZVtx)
+      cut.AddCut(VarManager::kVtxZ, zVtxMin, zVtxMax, false);
     if (applySoftwareTrigger)
-      fCut.AddCut(softwareTrigger, 0.5, 1.5, false);
-    fEventCut->AddCut(&fCut);
+      cut.AddCut(softwareTrigger, 0.5, 1.5, false);
+    eventCut->AddCut(&cut);
 
-    fHistMan = new HistogramManager("analysisHistos", "aa", VarManager::kNVars);
-    fHistMan->SetUseDefaultVariableNames(kTRUE);
-    fHistMan->SetDefaultVarNames(VarManager::fgVariableNames, VarManager::fgVariableUnits);
+    histMan = new HistogramManager("analysisHistos", "aa", VarManager::kNVars);
+    histMan->SetUseDefaultVariableNames(kTRUE);
+    histMan->SetDefaultVarNames(VarManager::fgVariableNames, VarManager::fgVariableUnits);
 
-    DefineHistograms(fHistMan, "EventBeforeCuts;EventAfterCuts;");
-    VarManager::SetUseVars(fHistMan->GetUsedVars());
-    fOutputList.setObject(fHistMan->GetMainHistogramList());
+    defineHistograms(histMan, "EventBeforeCuts;EventAfterCuts;");
+    VarManager::SetUseVars(histMan->GetUsedVars());
+    outputList.setObject(histMan->GetMainHistogramList());
   }
 
   Produces<aod::EventCuts> eventSel;
@@ -96,11 +96,11 @@ struct HfmEventSelection {
   {
     // select events
     VarManager::ResetValues(0, VarManager::kNEventWiseVariables);
-    VarManager::FillEvent<TEventFillMap>(event, fValues);
-    fHistMan->FillHistClass("EventBeforeCuts", fValues);
+    VarManager::FillEvent<TEventFillMap>(event, values);
+    histMan->FillHistClass("EventBeforeCuts", values);
 
-    if (fEventCut->IsSelected(fValues)) {
-      fHistMan->FillHistClass("EventAfterCuts", fValues);
+    if (eventCut->IsSelected(values)) {
+      histMan->FillHistClass("EventAfterCuts", values);
       eventSel(1);
     } else {
       eventSel(0);
@@ -122,10 +122,10 @@ struct HfmEventSelection {
 };
 
 struct MuonSelection {
-  Configurable<std::string> fConfigCuts{"cfgMuonCuts", "muonQualityCuts", "muon selection"};
+  Configurable<std::string> muonCuts{"muonCuts", "muonQualityCuts", "muon selection"};
 
-  float* fValues;
-  AnalysisCompositeCut* fTrackCut;
+  float* values;
+  AnalysisCompositeCut* trackCut;
 
   o2::framework::HistogramRegistry registry{
     "registry",
@@ -153,26 +153,26 @@ struct MuonSelection {
     AxisSpec axisEtaDif{200, -2., 2., "#eta diff"};
     AxisSpec axisPDif{200, -2., 2., "p diff (GeV/#it{c})"};
 
-    HistogramConfigSpec cfgTHnMu{HistType::kTHnSparseD, {axispT, axisEta, axisDCA, axisSign, axisP, axisVtxZ, axisTrkType, axisMCmask}, 8};
-    HistogramConfigSpec cfgTHnPt{HistType::kTHnSparseD, {axispT, axispTGen, axispTDif, axisTrkType}, 4};
-    HistogramConfigSpec cfgTHnEta{HistType::kTHnSparseD, {axisEta, axisEtaGen, axisEtaDif, axisTrkType}, 4};
-    HistogramConfigSpec cfgTHnP{HistType::kTHnSparseD, {axisP, axisPGen, axisPDif, axisTrkType}, 4};
+    HistogramConfigSpec hTHnMu{HistType::kTHnSparseD, {axispT, axisEta, axisDCA, axisSign, axisP, axisVtxZ, axisTrkType, axisMCmask}, 8};
+    HistogramConfigSpec hTHnPt{HistType::kTHnSparseD, {axispT, axispTGen, axispTDif, axisTrkType}, 4};
+    HistogramConfigSpec hTHnEta{HistType::kTHnSparseD, {axisEta, axisEtaGen, axisEtaDif, axisTrkType}, 4};
+    HistogramConfigSpec hTHnP{HistType::kTHnSparseD, {axisP, axisPGen, axisPDif, axisTrkType}, 4};
 
-    registry.add("hMuBcuts", "", cfgTHnMu);
-    registry.add("hMuAcuts", "", cfgTHnMu);
-    registry.add("hPTBcuts", "", cfgTHnPt);
-    registry.add("hPTAcuts", "", cfgTHnPt);
-    registry.add("hEtaBcuts", "", cfgTHnEta);
-    registry.add("hEtaAcuts", "", cfgTHnEta);
-    registry.add("hPBcuts", "", cfgTHnP);
-    registry.add("hPAcuts", "", cfgTHnP);
+    registry.add("hMuBcuts", "", hTHnMu);
+    registry.add("hMuAcuts", "", hTHnMu);
+    registry.add("hPTBcuts", "", hTHnPt);
+    registry.add("hPTAcuts", "", hTHnPt);
+    registry.add("hEtaBcuts", "", hTHnEta);
+    registry.add("hEtaAcuts", "", hTHnEta);
+    registry.add("hPBcuts", "", hTHnP);
+    registry.add("hPAcuts", "", hTHnP);
 
     VarManager::SetDefaultVarNames();
-    fValues = new float[VarManager::kNVars];
+    values = new float[VarManager::kNVars];
 
-    fTrackCut = new AnalysisCompositeCut(true);
-    TString selectStr = fConfigCuts.value;
-    fTrackCut->AddCut(dqcuts::GetAnalysisCut(selectStr.Data()));
+    trackCut = new AnalysisCompositeCut(true);
+    TString selectStr = muonCuts.value;
+    trackCut->AddCut(dqcuts::GetAnalysisCut(selectStr.Data()));
     VarManager::SetUseVars(AnalysisCut::fgUsedVars);
   }
 
@@ -183,12 +183,12 @@ struct MuonSelection {
     if (event.isEventSelected() == 0)
       return;
 
-    VarManager::ResetValues(0, VarManager::kNMuonTrackVariables, fValues);
-    VarManager::FillEvent<gEventFillMap>(event, fValues);
+    VarManager::ResetValues(0, VarManager::kNMuonTrackVariables, values);
+    VarManager::FillEvent<gEventFillMap>(event, values);
 
     // loop over muon tracks
     for (auto const& track : tracks) {
-      VarManager::FillTrack<TMuonFillMap>(track, fValues);
+      VarManager::FillTrack<TMuonFillMap>(track, values);
 
       // compute DCAXY
       std::vector<double> vecCovs{
@@ -208,19 +208,19 @@ struct MuonSelection {
       const auto dcaXY(std::sqrt(dcaX * dcaX + dcaY * dcaY));
       // Before Muon Cuts
       registry.fill(HIST("hMuBcuts"),
-                    fValues[VarManager::kPt],
-                    fValues[VarManager::kEta], dcaXY,
-                    fValues[VarManager::kCharge], track.p(),
-                    fValues[VarManager::kVtxZ],
-                    fValues[VarManager::kMuonTrackType], 0);
+                    values[VarManager::kPt],
+                    values[VarManager::kEta], dcaXY,
+                    values[VarManager::kCharge], track.p(),
+                    values[VarManager::kVtxZ],
+                    values[VarManager::kMuonTrackType], 0);
       // After Muon Cuts
-      if (fTrackCut->IsSelected(fValues))
+      if (trackCut->IsSelected(values))
         registry.fill(HIST("hMuAcuts"),
-                      fValues[VarManager::kPt],
-                      fValues[VarManager::kEta], dcaXY,
-                      fValues[VarManager::kCharge], track.p(),
-                      fValues[VarManager::kVtxZ],
-                      fValues[VarManager::kMuonTrackType], 0);
+                      values[VarManager::kPt],
+                      values[VarManager::kEta], dcaXY,
+                      values[VarManager::kCharge], track.p(),
+                      values[VarManager::kVtxZ],
+                      values[VarManager::kMuonTrackType], 0);
     } // end loop over muon tracks
   }
 
@@ -231,19 +231,19 @@ struct MuonSelection {
     if (event.isEventSelected() == 0)
       return;
 
-    VarManager::ResetValues(0, VarManager::kNMuonTrackVariables, fValues);
-    VarManager::FillEvent<gEventFillMap>(event, fValues);
+    VarManager::ResetValues(0, VarManager::kNMuonTrackVariables, values);
+    VarManager::FillEvent<gEventFillMap>(event, values);
 
     // loop over muon tracks
     for (auto const& track : tracks) {
-      VarManager::FillTrack<TMuonFillMap>(track, fValues);
+      VarManager::FillTrack<TMuonFillMap>(track, values);
 
       if (!track.has_mcParticle()) {
         continue;
       }
       auto mcParticle = track.mcParticle();
 
-      VarManager::FillTrack<TTrackMCFillMap>(mcParticle, fValues);
+      VarManager::FillTrack<TTrackMCFillMap>(mcParticle, values);
 
       // compute DCAXY
       std::vector<double> vecCovs{
@@ -263,35 +263,35 @@ struct MuonSelection {
       const auto dcaXY(std::sqrt(dcaX * dcaX + dcaY * dcaY));
       // Before Muon Cuts
       registry.fill(HIST("hMuBcuts"),
-                    fValues[VarManager::kPt],
-                    fValues[VarManager::kEta], dcaXY,
-                    fValues[VarManager::kCharge], track.p(),
-                    fValues[VarManager::kVtxZ],
-                    fValues[VarManager::kMuonTrackType],
+                    values[VarManager::kPt],
+                    values[VarManager::kEta], dcaXY,
+                    values[VarManager::kCharge], track.p(),
+                    values[VarManager::kVtxZ],
+                    values[VarManager::kMuonTrackType],
                     track.mcMask());
 
       registry.fill(HIST("hPTBcuts"),
-                    fValues[VarManager::kPt], fValues[VarManager::kMCPt], fValues[VarManager::kMCPt] - fValues[VarManager::kPt], fValues[VarManager::kMuonTrackType]);
+                    values[VarManager::kPt], values[VarManager::kMCPt], values[VarManager::kMCPt] - values[VarManager::kPt], values[VarManager::kMuonTrackType]);
       registry.fill(HIST("hEtaBcuts"),
-                    fValues[VarManager::kEta], fValues[VarManager::kMCEta], fValues[VarManager::kMCEta] - fValues[VarManager::kEta], fValues[VarManager::kMuonTrackType]);
+                    values[VarManager::kEta], values[VarManager::kMCEta], values[VarManager::kMCEta] - values[VarManager::kEta], values[VarManager::kMuonTrackType]);
       registry.fill(HIST("hPBcuts"),
-                    fValues[VarManager::kP], fValues[VarManager::kMCPt] * std::cosh(fValues[VarManager::kMCEta]), fValues[VarManager::kMCPt] * std::cosh(fValues[VarManager::kMCEta]) - fValues[VarManager::kP], fValues[VarManager::kMuonTrackType]);
+                    values[VarManager::kP], values[VarManager::kMCPt] * std::cosh(values[VarManager::kMCEta]), values[VarManager::kMCPt] * std::cosh(values[VarManager::kMCEta]) - values[VarManager::kP], values[VarManager::kMuonTrackType]);
       // After Muon Cuts
-      if (fTrackCut->IsSelected(fValues)) {
+      if (trackCut->IsSelected(values)) {
         registry.fill(HIST("hMuAcuts"),
-                      fValues[VarManager::kPt],
-                      fValues[VarManager::kEta], dcaXY,
-                      fValues[VarManager::kCharge], track.p(),
-                      fValues[VarManager::kVtxZ],
-                      fValues[VarManager::kMuonTrackType],
+                      values[VarManager::kPt],
+                      values[VarManager::kEta], dcaXY,
+                      values[VarManager::kCharge], track.p(),
+                      values[VarManager::kVtxZ],
+                      values[VarManager::kMuonTrackType],
                       track.mcMask());
 
         registry.fill(HIST("hPTAcuts"),
-                      fValues[VarManager::kPt], fValues[VarManager::kMCPt], fValues[VarManager::kMCPt] - fValues[VarManager::kPt], fValues[VarManager::kMuonTrackType]);
+                      values[VarManager::kPt], values[VarManager::kMCPt], values[VarManager::kMCPt] - values[VarManager::kPt], values[VarManager::kMuonTrackType]);
         registry.fill(HIST("hEtaAcuts"),
-                      fValues[VarManager::kEta], fValues[VarManager::kMCEta], fValues[VarManager::kMCEta] - fValues[VarManager::kEta], fValues[VarManager::kMuonTrackType]);
+                      values[VarManager::kEta], values[VarManager::kMCEta], values[VarManager::kMCEta] - values[VarManager::kEta], values[VarManager::kMuonTrackType]);
         registry.fill(HIST("hPAcuts"),
-                      fValues[VarManager::kP], fValues[VarManager::kMCPt] * std::cosh(fValues[VarManager::kMCEta]), fValues[VarManager::kMCPt] * std::cosh(fValues[VarManager::kMCEta]) - fValues[VarManager::kP], fValues[VarManager::kMuonTrackType]);
+                      values[VarManager::kP], values[VarManager::kMCPt] * std::cosh(values[VarManager::kMCEta]), values[VarManager::kMCPt] * std::cosh(values[VarManager::kMCEta]) - values[VarManager::kP], values[VarManager::kMuonTrackType]);
       }
     } // end loop over muon tracks
   }
