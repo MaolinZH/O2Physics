@@ -57,7 +57,7 @@ void defineHistograms(HistogramManager*, TString);
 struct HfmEventSelection {
   Configurable<bool> applySoftwareTrigger{"appllySoftwareTrigger", false, "whether to apply the software trigger"};
   Configurable<int> softwareTrigger{"softwareTrigger", VarManager::kIsMuonSingleLowPt7, "software trigger flag"};
-  Configurable<bool> applyCutZVtx{"applyzVtx", false, "whether to apply the VtxZ cut"};
+  Configurable<bool> applyCutZVtx{"applyCutZVtx", false, "whether to apply the VtxZ cut"};
   Configurable<float> zVtxMin{"zVtxMin", -10., "min. z of primary vertex [cm]"};
   Configurable<float> zVtxMax{"zVtxMax", 10., "max. z of primary vertex [cm]"};
 
