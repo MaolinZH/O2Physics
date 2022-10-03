@@ -108,18 +108,18 @@ struct HfmEventSelection {
     }
   }
 
-  void processEventDataAO2D(MyCollisions::iterator const& event, aod::BCs const& bcs)
+  void processEvent(MyCollisions::iterator const& event, aod::BCs const& bcs)
   {
     runEventSel<gEventFillMap>(event, bcs);
   }
 
-  void processEventMCAO2D(MyMcCollisions::iterator const& event, aod::BCs const& bcs)
+  void processEventMC(MyMcCollisions::iterator const& event, aod::BCs const& bcs)
   {
     runEventSel<gEventFillMap>(event, bcs);
   }
 
-  PROCESS_SWITCH(HfmEventSelection, processEventDataAO2D, "run event selection with Data AO2D file", true);
-  PROCESS_SWITCH(HfmEventSelection, processEventMCAO2D, "run event selection with MC AO2D file", false);
+  PROCESS_SWITCH(HfmEventSelection, processEvent, "run event selection with real data", true);
+  PROCESS_SWITCH(HfmEventSelection, processEventMC, "run event selection with MC data", false);
 };
 
 struct MuonSelection {
@@ -178,7 +178,7 @@ struct MuonSelection {
   }
 
   template <uint32_t TEventFillMap, uint32_t TMuonFillMap, typename TEvent, typename TMuons>
-  void runDataMuonSel(TEvent const& event, aod::BCs const& bcs, TMuons const& tracks)
+  void runMuonSel(TEvent const& event, aod::BCs const& bcs, TMuons const& tracks)
   {
     // select muons in data
     if (event.isEventSelected() == 0)
@@ -226,7 +226,7 @@ struct MuonSelection {
   }
 
   template <uint32_t TEventFillMap, uint32_t TMuonFillMap, uint32_t TTrackMCFillMap, typename TEvent, typename TMuons, typename TMC>
-  void runMCMuonSel(TEvent const& event, aod::BCs const& bcs, TMuons const& tracks, TMC const& mc)
+  void runMuonSelMC(TEvent const& event, aod::BCs const& bcs, TMuons const& tracks, TMC const& mc)
   {
     // select muons in MC
     if (event.isEventSelected() == 0)
@@ -297,20 +297,20 @@ struct MuonSelection {
     } // end loop over muon tracks
   }
 
-  void processMuonDataAO2D(MyEventsSelected::iterator const& event, aod::BCs const& bcs,
+  void processMuon(MyEventsSelected::iterator const& event, aod::BCs const& bcs,
                            aod::FullFwdTracks const& tracks)
   {
-    runDataMuonSel<gEventFillMap, gMuonFillMap>(event, bcs, tracks);
+    runMuonSel<gEventFillMap, gMuonFillMap>(event, bcs, tracks);
   }
 
-  void processMuonMCAO2D(MyMcEventsSelected::iterator const& event, aod::BCs const& bcs,
+  void processMuonMC(MyMcEventsSelected::iterator const& event, aod::BCs const& bcs,
                          MyMuons const& tracks, aod::McParticles const& mc)
   {
-    runMCMuonSel<gEventFillMap, gMuonFillMap, gTrackMCFillMap>(event, bcs, tracks, mc);
+    runMuonSelMC<gEventFillMap, gMuonFillMap, gTrackMCFillMap>(event, bcs, tracks, mc);
   }
 
-  PROCESS_SWITCH(MuonSelection, processMuonDataAO2D, "run muonselection with Data AO2D file", true);
-  PROCESS_SWITCH(MuonSelection, processMuonMCAO2D, "run muonselection with MC AO2D file", false);
+  PROCESS_SWITCH(MuonSelection, processMuon, "run muonselection with Data AO2D file", true);
+  PROCESS_SWITCH(MuonSelection, processMuonMC, "run muonselection with MC AO2D file", false);
 };
 
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
