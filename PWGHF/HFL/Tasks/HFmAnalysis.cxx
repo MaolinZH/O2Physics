@@ -52,6 +52,7 @@ constexpr static uint32_t gMuonFillMap(VarManager::ObjTypes::Muon | VarManager::
 constexpr static uint32_t gEventFillMap(VarManager::ObjTypes::BC | VarManager::ObjTypes::Collision);
 constexpr static uint32_t gTrackMCFillMap(VarManager::ObjTypes::ParticleMC);
 
+/// Defines the histograms for classes required in analysis.
 void defineHistograms(HistogramManager*, TString);
 
 struct HfmEventSelection {
