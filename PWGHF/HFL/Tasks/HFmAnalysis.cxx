@@ -298,13 +298,13 @@ struct MuonSelection {
   }
 
   void processMuon(MyEventsSelected::iterator const& event, aod::BCs const& bcs,
-                           aod::FullFwdTracks const& tracks)
+                   aod::FullFwdTracks const& tracks)
   {
     runMuonSel<gEventFillMap, gMuonFillMap>(event, bcs, tracks);
   }
 
   void processMuonMC(MyMcEventsSelected::iterator const& event, aod::BCs const& bcs,
-                         MyMuons const& tracks, aod::McParticles const& mc)
+                     MyMuons const& tracks, aod::McParticles const& mc)
   {
     runMuonSelMC<gEventFillMap, gMuonFillMap, gTrackMCFillMap>(event, bcs, tracks, mc);
   }
