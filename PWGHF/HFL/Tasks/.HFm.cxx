@@ -195,7 +195,7 @@ struct MuonSelection {
       VarManager::FillTrack<TMuonFillMap>(track, values);
 
       // compute DCAXY
-   /*   std::vector<double> vecCovs{
+      /*   std::vector<double> vecCovs{
         track.cXX(), track.cXY(), track.cYY(),
         track.cPhiX(), track.cPhiY(), track.cPhiPhi(),
         track.cTglX(), track.cTglY(), track.cTglPhi(), track.cTglTgl(),
@@ -210,7 +210,6 @@ struct MuonSelection {
       const auto dcaX(trackParcov.getX() - event.posX());
       const auto dcaY(trackParcov.getY() - event.posY());*/
       const auto dcaXY(std::sqrt(values[VarManager::kMuonDCAx] * values[VarManager::kMuonDCAx] + values[VarManager::kMuonDCAy] * values[VarManager::kMuonDCAy]));
-
 
       // Before Muon Cuts
       registry.fill(HIST("hMuBcuts"),
@@ -252,7 +251,7 @@ struct MuonSelection {
       VarManager::FillTrack<TTrackMCFillMap>(mcParticle, values);
 
       // compute DCAXY
-     /* std::vector<double> vecCovs{
+      /* std::vector<double> vecCovs{
         track.cXX(), track.cXY(), track.cYY(),
         track.cPhiX(), track.cPhiY(), track.cPhiPhi(),
         track.cTglX(), track.cTglY(), track.cTglPhi(), track.cTglTgl(),
