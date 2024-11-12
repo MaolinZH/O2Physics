@@ -68,6 +68,7 @@ enum DQTriggers {
   kSingleMuLow,
   kSingleMuHigh,
   kDiMuon,
+  kElectronMuon,
   kNTriggersDQ
 };
 } // namespace
@@ -510,10 +511,11 @@ struct DQFilterPPTask {
 
   Configurable<std::string> fConfigBarrelSelections{"cfgBarrelSels", "jpsiPID1:pairMassLow:1", "<track-cut>:[<pair-cut>]:<n>,[<track-cut>:[<pair-cut>]:<n>],..."};
   Configurable<std::string> fConfigMuonSelections{"cfgMuonSels", "muonQualityCuts:pairNoCut:1", "<muon-cut>:[<pair-cut>]:<n>"};
+  Configurable<std::string> fConfigElectronMuonSelections{"cfgElectronMuonSels", "jpsiPID1:muonQualityCuts:pairNoCut:1", "<track-cut>:<muon-cut>:[<pair-cut>]:<n>"};
   Configurable<bool> fConfigQA{"cfgWithQA", false, "If true, fill QA histograms"};
   Configurable<std::string> fConfigFilterLsBarrelTracksPairs{"cfgWithBarrelLS", "false", "Comma separated list of booleans for each trigger, If true, also select like sign (--/++) barrel track pairs"};
   Configurable<std::string> fConfigFilterLsMuonsPairs{"cfgWithMuonLS", "false", "Comma separated list of booleans for each trigger, If true, also select like sign (--/++) muon pairs"};
-
+  Configurable<std::string> fConfigFilterLsElectronMuonsPairs{"cfgWithElectronMuonLS", "false", "Comma separated list of booleans for each trigger, If true, also select like sign (--/++) muon pairs"};
   Configurable<bool> fPropMuon{"cfgPropMuon", false, "Propgate muon tracks through absorber"};
   Configurable<string> fConfigCcdbUrl{"ccdb-url", "http://alice-ccdb.cern.ch", "url of the ccdb repository"};
   Configurable<std::string> geoPath{"geoPath", "GLO/Config/GeometryAligned", "Path of the geometry file"};
@@ -526,14 +528,20 @@ struct DQFilterPPTask {
 
   int fNBarrelCuts;                                    // number of barrel selections
   int fNMuonCuts;                                      // number of muon selections
+  int fNElectronMuonCuts;                              // number of electron-muon selections
   std::vector<bool> fBarrelRunPairing;                 // bit map on whether the selections require pairing (barrel)
   std::vector<bool> fMuonRunPairing;                   // bit map on whether the selections require pairing (muon)
+  std::vector<bool> fElectronMuonRunPairing;            //bit map on whether the selections require pairing (e-mu)
   std::vector<int> fBarrelNreqObjs;                    // minimal number of tracks/pairs required (barrel)
   std::vector<int> fMuonNreqObjs;                      // minimal number of tracks/pairs required (muon)
+  std::vector<int> fElectronMuonNreqObjs;              //minimal number of electron-muon pairs required
   std::map<int, AnalysisCompositeCut> fBarrelPairCuts; // map of barrel pair cuts
   std::map<int, AnalysisCompositeCut> fMuonPairCuts;   // map of muon pair cuts
+  std::map<int, AnalysisCompositeCut> fElectronMuonPairCuts;   //map of electron-muon pair cuts
   std::map<int, TString> fBarrelPairHistNames;         // map with names of the barrel pairing histogram directories
   std::map<int, TString> fMuonPairHistNames;           // map with names of the muon pairing histogram directories
+  std::map<int, TString> fElectronMuonPairHistNames;   // map with names of the electron-muon pairing histogram directories
+    
 
   std::map<uint64_t, uint64_t> fFiltersMap;           // map of filters for events that passed at least one filter
   std::map<uint64_t, std::vector<bool>> fCEFPfilters; // map of CEFP filters for events that passed at least one filter
@@ -584,10 +592,33 @@ struct DQFilterPPTask {
         }
       }
     }
+      //electron-muon pair
+      TString electronMuonSelsStr = fConfigElectronMuonSelections.value;
+      std::unique_ptr<TObjArray> objArray3(electronMuonSelsStr.Tokenize(","));
+      fNElectronMuonCuts = objArray3->GetEntries();
+      if (fNElectronMuonCuts) {
+        for (int icut = 0; icut < fNElectronMuonCuts; ++icut) {
+          TString selStr = objArray3->At(icut)->GetName();
+          std::unique_ptr<TObjArray> sel(selStr.Tokenize(":"));
+          if (sel->GetEntries() < 3 || sel->GetEntries() > 4) {
+            continue;
+          }
+          // if "sel" contains 4 entries, it means the user provided both the track and pair cuts
+          if (sel->GetEntries() == 4) {
+            fElectronMuonPairCuts[icut] = (*dqcuts::GetCompositeCut(sel->At(2)->GetName()));
+            fElectronMuonRunPairing.push_back(true);
+            fElectronMuonNreqObjs.push_back(std::atoi(sel->At(3)->GetName()));
+            fElectronMuonPairHistNames[icut] = Form("PairsElectronMuonSEPM_%s_%s_%s", sel->At(0)->GetName(), sel->At(1)->GetName(), sel->At(2)->GetName());
+          } else {
+            fElectronMuonNreqObjs.push_back(std::atoi(sel->At(2)->GetName()));
+            fElectronMuonRunPairing.push_back(false);
+          }
+        }
+      }
     VarManager::SetUseVars(AnalysisCut::fgUsedVars);
 
     // setup the Stats histogram
-    fStats.setObject(new TH1D("Statistics", "Stats for DQ triggers", fNBarrelCuts + fNMuonCuts + 2, -2.5, -0.5 + fNBarrelCuts + fNMuonCuts));
+    fStats.setObject(new TH1D("Statistics", "Stats for DQ triggers", fNBarrelCuts + fNMuonCuts + fNElectronMuonCuts + 2, -2.5, -0.5 + fNBarrelCuts + fNMuonCuts + fNElectronMuonCuts));
     fStats->GetXaxis()->SetBinLabel(1, "Events inspected");
     fStats->GetXaxis()->SetBinLabel(2, "Events selected");
     if (fNBarrelCuts) {
@@ -598,6 +629,11 @@ struct DQFilterPPTask {
     if (fNMuonCuts) {
       for (int ib = 3 + fNBarrelCuts; ib < 3 + fNBarrelCuts + fNMuonCuts; ib++) {
         fStats->GetXaxis()->SetBinLabel(ib, objArray2->At(ib - 3 - fNBarrelCuts)->GetName());
+      }
+    }
+    if (fNElectronMuonCuts) {
+      for (int ib = 3 + fNBarrelCuts + fNMuonCuts; ib < 3 + fNBarrelCuts + fNMuonCuts + fNElectronMuonCuts; ib++) {
+        fStats->GetXaxis()->SetBinLabel(ib, objArray3->At(ib - 3 - fNBarrelCuts - fNMuonCuts)->GetName());
       }
     }
   }
@@ -626,6 +662,10 @@ struct DQFilterPPTask {
         histNames += ";";
       }
       for (const auto& [key, value] : fMuonPairHistNames) {
+        histNames += value;
+        histNames += ";";
+      }
+      for (const auto& [key, value] : fElectronMuonPairHistNames) {
         histNames += value;
         histNames += ";";
       }
@@ -802,6 +842,64 @@ struct DQFilterPPTask {
       }
     }
 
+      //electron-muon pair
+    std::vector<int> objCountersElectronMuon(fNElectronMuonCuts, 0); // init all counters to zero
+    pairingMask = 0; // reset the mask for the e-mu
+    for (auto& [trackAssoc, muon] : combinations(barrelAssocs, muonAssocs)) {
+      for (int i = 0; i < fNElectronMuonCuts; ++i) {
+        if (trackAssoc.isDQBarrelSelected() & muon.isDQMuonSelected() & (uint32_t(1) << i)) {
+          if (fElectronMuonRunPairing[i]) {
+            pairingMask |= (uint32_t(1) << i);
+          }
+        }
+      }
+    }
+    // check which selection should use like sign (LS) (--/++) muon track pairs
+    pairingLS = 0; // reset the decisions for electron-muons
+    TString electronMuonLSstr = fConfigFilterLsElectronMuonsPairs.value;
+    std::unique_ptr<TObjArray> objArrayElectronMuonLS(electronMuonLSstr.Tokenize(","));
+    for (int icut = 0; icut < fNElectronMuonCuts; icut++) {
+      TString objStr = objArrayElectronMuonLS->At(icut)->GetName();
+      if (!objStr.CompareTo("true")) {
+        pairingLS |= (uint32_t(1) << icut);
+      }
+    }
+
+    // run pairing if there is at least one selection that requires it
+    pairFilter = 0;
+    if (pairingMask > 0) {
+      // pairing is done using the collision grouped electron and muon associations
+      for (auto& [a1, a2] : combinations(barrelAssocs, muonAssocs)) {
+        // check the pairing mask and that the tracks share a cut bit
+        pairFilter = pairingMask & a1.isDQBarrelSelected() & a2.isDQMuonSelected();
+        if (pairFilter == 0) {
+          continue;
+        }
+        // get the real electron and muon tracks
+        auto t1 = a1.template track_as<TTracks>();
+        auto t2 = a2.template fwdtrack_as<TMuons>();
+        // construct the pair and apply cuts
+        VarManager::FillPair<VarManager::kElectronMuon, TTrackFillMap>(t1, t2); // compute pair quantities
+        for (int icut = 0; icut < fNElectronMuonCuts; icut++) {
+          // select like-sign pairs if trigger has set boolean true within fConfigFilterLsElectronMuonsPairs
+          if (!(pairingLS & (uint32_t(1) << icut))) {
+            if (t1.sign() * t2.sign() > 0) {
+              continue;
+            }
+          }
+          if (!(pairFilter & (uint32_t(1) << icut))) {
+            continue;
+          }
+          if (!fElectronMuonPairCuts[icut].IsSelected(VarManager::fgValues)) {
+            continue;
+          }
+          objCountersElectronMuon[icut] += 1;
+          if (fConfigQA) {
+            fHistMan->FillHistClass(fElectronMuonPairHistNames[icut].Data(), VarManager::fgValues);
+          }
+        }
+      }
+    }
     // compute the decisions and publish
     uint64_t filter = 0;
     for (int i = 0; i < fNBarrelCuts; i++) {
@@ -812,6 +910,11 @@ struct DQFilterPPTask {
     for (int i = 0; i < fNMuonCuts; i++) {
       if (objCountersMuon[i] >= fMuonNreqObjs[i]) {
         filter |= (uint64_t(1) << (i + fNBarrelCuts));
+      }
+    }
+    for (int i = 0; i < fNElectronMuonCuts; i++) {
+      if (objCountersElectronMuon[i] >= fElectronMuonNreqObjs[i]) {
+        filter |= (uint64_t(1) << (i + fNBarrelCuts + fNMuonCuts));
       }
     }
     return filter;
@@ -839,7 +942,6 @@ struct DQFilterPPTask {
     for (int i = fNBarrelCuts; i < fNBarrelCuts + fNMuonCuts; i++) {
       muonMask |= (uint64_t(1) << i);
     }
-
     // Loop over collisions
     // int event = 0;
     int eventsFired = 0;
@@ -880,6 +982,13 @@ struct DQFilterPPTask {
         }
       }
 
+      for (int i = fNBarrelCuts + fNMuonCuts; i < fNBarrelCuts + fNMuonCuts + fNElectronMuonCuts; i++) {
+        if (filter & (uint64_t(1) << i)) {
+          if (i < kNTriggersDQ) {
+            decisions[i] = true;
+          }
+        }
+      }
       // if this collision fired at least one input, add it to the map, or if it is there already, update the decisions with a logical OR
       // This may happen in the case when some collisions beyond the iterator are added because they contain ambiguous tracks fired on by another collision
       if (fFiltersMap.find(collision.globalIndex()) == fFiltersMap.end()) {
@@ -960,23 +1069,24 @@ struct DQFilterPPTask {
       fStats->Fill(-2.0);
       if (!collision.isDQEventSelected()) {
         eventFilter(0);
-        dqtable(false, false, false, false, false, false, false);
+        dqtable(false, false, false, false, false, false, false, false);
         continue;
       }
       fStats->Fill(-1.0);
 
       if (fFiltersMap.find(collision.globalIndex()) == fFiltersMap.end()) {
         eventFilter(0);
-        dqtable(false, false, false, false, false, false, false);
+        dqtable(false, false, false, false, false, false, false, false);
       } else {
         totalEventsTriggered++;
-        for (int i = 0; i < fNBarrelCuts + fNMuonCuts; i++) {
-          if (fFiltersMap[collision.globalIndex()] & (uint32_t(1) << i))
-            fStats->Fill(static_cast<float>(i));
-        }
+          for (int i = 0; i < fNBarrelCuts + fNMuonCuts + fNElectronMuonCuts; i++) {
+              if (fFiltersMap[collision.globalIndex()] & (uint32_t(1) << i))
+                  fStats->Fill(static_cast<float>(i));
+              }
+          }
         eventFilter(fFiltersMap[collision.globalIndex()]);
         auto dqDecisions = fCEFPfilters[collision.globalIndex()];
-        dqtable(dqDecisions[0], dqDecisions[1], dqDecisions[2], dqDecisions[3], dqDecisions[4], dqDecisions[5], dqDecisions[6]);
+        dqtable(dqDecisions[0], dqDecisions[1], dqDecisions[2], dqDecisions[3], dqDecisions[4], dqDecisions[5], dqDecisions[6], dqDecisions[7]);
       }
     }
 
@@ -1021,7 +1131,7 @@ void DefineHistograms(HistogramManager* histMan, TString histClasses)
       dqhistograms::DefineHistograms(histMan, objArray->At(iclass)->GetName(), "track", "its,tpcpid,dca");
     }
 
-    if (classStr.Contains("Muon")) {
+    if (classStr.Contains("Muon") && !classStr.Contains("Electron")) {
       dqhistograms::DefineHistograms(histMan, objArray->At(iclass)->GetName(), "track", "muon");
     }
 
@@ -1032,6 +1142,9 @@ void DefineHistograms(HistogramManager* histMan, TString histClasses)
       if (classStr.Contains("Forward")) {
         dqhistograms::DefineHistograms(histMan, objArray->At(iclass)->GetName(), "pair", "dimuon,vertexing-forward");
       }
+        if (classStr.Contains("ElectronMuon")) {
+          dqhistograms::DefineHistograms(histMan, objArray->At(iclass)->GetName(), "pair", "electronmuon");
+        }
     }
   }
 }
